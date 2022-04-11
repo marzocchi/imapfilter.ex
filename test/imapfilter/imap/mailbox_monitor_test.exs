@@ -1,5 +1,5 @@
 defmodule ImapFilter.Imap.MailboxMonitorTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   @moduletag :capture_log
 
   alias ImapFilter.Imap.MailboxMonitor
@@ -35,7 +35,8 @@ defmodule ImapFilter.Imap.MailboxMonitorTest do
   end
 
   test "monitor changes", %{session_pid: session_pid, mailbox: mailbox} do
+    Process.sleep(1_000)
     Session.append(session_pid, "Subject: .\r\n.\r\n", mailbox)
-    assert_receive {:mailbox_activity, lines} when is_list(lines), 5_000
+    assert_receive {:mailbox_activity, lines} when is_list(lines), 15_000
   end
 end

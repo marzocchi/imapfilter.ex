@@ -1,4 +1,4 @@
-defmodule Imap.MixProject do
+defmodule ImapFilter.MixProject do
   use Mix.Project
 
   def project do

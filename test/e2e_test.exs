@@ -1,5 +1,5 @@
 defmodule ImapFilter.EndToEndTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   @moduletag :capture_log
 
@@ -56,7 +56,7 @@ defmodule ImapFilter.EndToEndTest do
                Request.append(msg, "EndToEndSource") |> Request.tagged(3)
              )
 
-    assert_receive {:mailbox_activity, _lines}, 5_000
+    assert_receive {:mailbox_activity, _lines}, 15_000
 
     assert %Response{status: :ok} =
              Client.get_response(socket, Request.select("EndToEndDest") |> Request.tagged(3))
