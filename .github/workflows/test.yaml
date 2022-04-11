@@ -1,9 +1,6 @@
 name: Test
 
 on:
-  push:
-    branches:
-    - main
   pull_request:
     branches:
     - main
@@ -21,16 +18,15 @@ jobs:
         ports:
           - "10143:143"
           - "10993:993"
-
-    strategy:
-      matrix:
-        otp: ['24']
-        elixir: ['1.13.2']
+        
     steps:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: ${{matrix.otp}}
-          elixir-version: ${{matrix.elixir}}
-      - run: mix deps.get
-      - run: mix test
+          otp-version: 24
+          elixir-version: 1.13.3
+
+      - name: Get deps
+        run: mix deps.get
+      - name: Run tests
+        run: mix test
