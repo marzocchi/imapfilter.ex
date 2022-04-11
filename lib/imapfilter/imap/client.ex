@@ -1,6 +1,4 @@
 defmodule ImapFilter.Imap.Client do
-  import Logger
-
   # works around 'imported Kernel.send/2 conflicts with local function' which happens when aliasing
   import Kernel, except: [send: 2]
 

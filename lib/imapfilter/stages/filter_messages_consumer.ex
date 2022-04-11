@@ -21,11 +21,11 @@ defmodule ImapFilter.Stages.FilterMessagesConsumer do
 
       case find_matching_rule(rule_arg, rules) do
         %{actions: _actions, label: label} = rule ->
-          Logger.info("rule matched: #{label}")
+          info("rule matched: #{label}")
           apply_actions(session, rule_arg, rule)
 
         _ ->
-          Logger.info("no rule matched")
+          info("no rule matched")
       end
     end)
 
@@ -40,18 +40,18 @@ defmodule ImapFilter.Stages.FilterMessagesConsumer do
     |> Enum.each(fn action ->
       case action do
         %{impl: "move_to_folder" = impl, args: [to_folder]} ->
-          Logger.info("applying rule #{label}'s action '#{impl}' to message #{uid}")
+          info("applying rule #{label}'s action '#{impl}' to message #{uid}")
 
           Session.move(session, msgid, to_folder)
           |> case do
             %Response{status: :bad, status_line: status_line} ->
-              Logger.error("action failed: BAD #{status_line}")
+              error("action failed: BAD #{status_line}")
 
             %Response{status: :no, status_line: status_line} ->
-              Logger.error("action failed: NO #{status_line}")
+              error("action failed: NO #{status_line}")
 
             %Response{status: :ok, status_line: status_line} ->
-              Logger.info("action succeeded: OK #{status_line}")
+              info("action succeeded: OK #{status_line}")
           end
       end
     end)

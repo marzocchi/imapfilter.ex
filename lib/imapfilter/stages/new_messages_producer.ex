@@ -37,15 +37,14 @@ defmodule ImapFilter.Stages.NewMessagesProducer do
           pending_demand: pending_demand
         } = state
       ) do
-
-    Logger.info("mailbox activity: #{activity}")
+    info("mailbox activity: #{activity}")
 
     enqueue_new_messages(session_name, mailbox, queue_name)
 
     messages = get_demanded_messages(pending_demand, [], queue_name)
     pending_demand = pending_demand - length(messages)
 
-    Logger.info(
+    info(
       "queue size=#{MessageQueue.size(queue_name)}, sending #{length(messages)} pending messages, pending_demand=#{pending_demand}"
     )
 
@@ -56,13 +55,12 @@ defmodule ImapFilter.Stages.NewMessagesProducer do
         demand,
         %{queue_name: queue_name, session_name: session_name, mailbox: mailbox} = state
       ) do
-
     enqueue_new_messages(session_name, mailbox, queue_name)
 
     messages = get_demanded_messages(demand, [], queue_name)
     pending_demand = demand - length(messages)
 
-    Logger.info(
+    info(
       "demand=#{demand}, satisfied=#{length(messages)}, pending_demand=#{pending_demand}, queued=#{MessageQueue.size(queue_name)}"
     )
 

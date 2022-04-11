@@ -34,11 +34,4 @@ defmodule ImapFilter do
       end
     end
   end
-
-  defmodule Actions do
-    def move_to_folder({_, _, msg}, folder_name) do
-
-    end
-  end
-
 end

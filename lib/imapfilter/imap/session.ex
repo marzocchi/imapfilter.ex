@@ -107,7 +107,7 @@ defmodule ImapFilter.Imap.Session do
 
     case resp do
       {%Response{status: :ok} = resp, counter} ->
-        Logger.info(
+        info(
           "Request #{resp.req.tag} #{resp.req.command} succeeded: #{resp.status} #{resp.status_line}"
         )
 
@@ -118,7 +118,7 @@ defmodule ImapFilter.Imap.Session do
          status: status,
          status_line: status_line
        } = resp, counter} ->
-        Logger.error("Request #{tag} #{command} failed: #{status} #{status_line}")
+        error("Request #{tag} #{command} failed: #{status} #{status_line}")
 
         {[resp | responses], counter}
     end

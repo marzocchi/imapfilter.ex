@@ -68,13 +68,13 @@ defmodule ImapFilter.Socket do
   defp log_outgoing(msg) do
     String.split(msg, "\r\n")
     |> Enum.map(fn line -> "-> #{line}" end)
-    |> Enum.each(&Logger.debug/1)
+    |> Enum.each(&debug/1)
 
     msg
   end
 
   defp log_incoming({:error, _ = err} = arg) do
-    Logger.debug("<- (socket error: #{err})")
+    debug("<- (socket error: #{err})")
     arg
   end
 
@@ -86,7 +86,7 @@ defmodule ImapFilter.Socket do
   defp log_incoming(msg) do
     String.split(msg, "\r\n")
     |> Enum.map(fn line -> "<- #{line}" end)
-    |> Enum.each(&Logger.debug/1)
+    |> Enum.each(&debug/1)
 
     msg
   end
