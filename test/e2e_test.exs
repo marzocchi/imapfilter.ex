@@ -29,7 +29,7 @@ defmodule ImapFilter.EndToEndTest do
     }
 
     %{
-      monitor_pid: start_supervised!({MailboxMonitor, monitor_params}),
+      monitor_pid: start_supervised!({MailboxMonitor, monitor_params})
     }
   end
 
@@ -50,6 +50,8 @@ defmodule ImapFilter.EndToEndTest do
     assert %Response{status: :ok} =
              Client.get_response(socket, Request.select("EndToEndSource") |> Request.tagged(2))
 
+    assert_receive :idle_started, 1_000
+
     assert %Response{status: :ok} =
              Client.get_response(
                socket,
@@ -62,7 +64,9 @@ defmodule ImapFilter.EndToEndTest do
              Client.get_response(socket, Request.select("EndToEndDest") |> Request.tagged(3))
 
     assert %Response{status: :ok} =
-             Client.get_response(socket, Request.search([:header, "Message-Id", msgid]) |> Request.tagged(3))
-
+             Client.get_response(
+               socket,
+               Request.search([:header, "Message-Id", msgid]) |> Request.tagged(3)
+             )
   end
 end

@@ -35,7 +35,8 @@ defmodule ImapFilter.Imap.MailboxMonitorTest do
   end
 
   test "monitor changes", %{session_pid: session_pid, mailbox: mailbox} do
-    Process.sleep(1_000)
+    assert_receive :idle_started, 1_000
+
     Session.append(session_pid, "Subject: .\r\n.\r\n", mailbox)
     assert_receive {:mailbox_activity, lines} when is_list(lines), 15_000
   end

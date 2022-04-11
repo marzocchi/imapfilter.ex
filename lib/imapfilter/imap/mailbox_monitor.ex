@@ -70,14 +70,14 @@ defmodule ImapFilter.Imap.MailboxMonitor do
 
     Socket.setopts(socket, active: true)
 
-    send(self(), :idle_wait)
+    send(self(), :idle_start)
     {:noreply, %{state | socket: socket, counter: counter}}
   end
 
   @impl true
   def handle_info(
-        :idle_wait,
-        %{socket: socket, counter: counter, reidle_interval: reidle_interval} = state
+        :idle_start,
+        %{socket: socket, counter: counter, reidle_interval: reidle_interval, notify: notify} = state
       ) do
     :ok =
       Socket.send(
@@ -85,19 +85,22 @@ defmodule ImapFilter.Imap.MailboxMonitor do
         Request.idle() |> Request.tagged(counter = counter + 1) |> Request.raw()
       )
 
-    Process.send_after(self(), :idle_done, reidle_interval)
+    send(notify, :idle_started)
+
+    Process.send_after(self(), :idle_stop, reidle_interval)
     {:noreply, %{state | counter: counter}}
   end
 
   @impl true
-  def handle_info(:idle_done, %{socket: socket, counter: counter} = state) do
+  def handle_info(:idle_stop, %{socket: socket, counter: counter, notify: notify} = state) do
     :ok =
       Socket.send(
         socket,
         Request.done() |> Request.raw()
       )
 
-    send(self(), :idle_wait)
+    send(notify, :idle_stopped)
+    send(self(), :idle_start)
     {:noreply, %{state | counter: counter}}
   end
 
