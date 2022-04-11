@@ -1,0 +1,36 @@
+name: Test
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  test:
+    name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
+    runs-on: ubuntu-latest
+    services:
+      dovecot:
+        image: ghcr.io/marzocchi/dovecot-test:latest
+        ports:
+          - "10143:143"
+          - "10993:993"
+
+    strategy:
+      matrix:
+        otp: ['24']
+        elixir: ['1.13.2']
+    steps:
+      - uses: actions/checkout@v2
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{matrix.otp}}
+          elixir-version: ${{matrix.elixir}}
+      - run: mix deps.get
+      - run: mix test --cover

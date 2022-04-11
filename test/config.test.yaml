@@ -1,0 +1,14 @@
+accounts:
+  - host: localhost
+    port: 10143
+    user: user1
+    pass: password
+    mailbox: EndToEndSource
+    type: tcp
+    verify: false
+    rules:
+      - label: Move to accounts
+        impl: header_regex
+        args: [To, ".*"]
+        actions:
+          - {impl: move_to_folder, args: [EndToEndDest]}

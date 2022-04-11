@@ -1,0 +1,17 @@
+Return-Path: <hello@example.invalid>
+Delivered-To: hello@example.invalid
+Received: some server
+	for <hello@example.invalid>; Fri, 01 Apr 2022 11:20:43 +0200
+From: Federico Marzocchi <hello@example.invalid>
+Content-Type: text/plain;
+	charset=us-ascii
+Content-Transfer-Encoding: 7bit
+MIME-Version: 1.0
+Subject: RE: Very important message
+Message-Id: <48D44CE7-72BE-434A-892D-9421F7E504CE@example.invalid>
+Date: Fri, 1 Apr 2022 11:20:41 +0200
+To: Federico Marzocchi <hello@example.invalid>
+
+> Hello!
+
+To you!

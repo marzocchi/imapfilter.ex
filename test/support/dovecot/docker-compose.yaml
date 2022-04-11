@@ -1,0 +1,12 @@
+  services:
+    dovecot:
+      container_name: dovecot
+      user: root
+      build: .
+      ports:
+        - '10143:143'
+        - '10993:993'
+      restart: unless-stopped
+      volumes:
+        - './dovecot.conf:/etc/dovecot/dovecot.conf'
+        - './passwd:/etc/dovecot/passwd'

@@ -1,0 +1,14 @@
+accounts:
+  - host: example.invalid
+    port: 993
+    user: hello@example.invalid
+    pass: secret
+    mailbox: INBOX
+    type: ssl
+    verify: false
+    rules:
+      - label: Move to accounts
+        impl: header_regex
+        args: [To, "accounts\..*@mrz.io"]
+        actions:
+          - {impl: move_to_folder, args: [Accounts]}
