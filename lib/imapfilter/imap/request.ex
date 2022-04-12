@@ -52,6 +52,10 @@ defmodule ImapFilter.Imap.Request do
     %Request{command: :uid_fetch, params: [uid, :fetch_rfc822_headers]}
   end
 
+  def fetch_attributes(uid) do
+    %Request{command: :uid_fetch, params: [uid, :fetch_attributes]}
+  end
+
   def fetch(uid) do
     %Request{command: :uid_fetch, params: [uid, :fetch_rfc822]}
   end
@@ -114,6 +118,9 @@ defmodule ImapFilter.Imap.Request do
 
   defp map_param(p) do
     case p do
+      :fetch_attributes ->
+        "(RFC822.HEADER FLAGS)"
+
       :fetch_rfc822_headers ->
         "RFC822.HEADER"
 

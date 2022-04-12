@@ -61,9 +61,8 @@ defmodule ImapFilter.Stages.FilterMessagesConsumer do
     headers =
       Session.fetch_headers(session, msgid)
       |> case do
-        %Response{status: :ok} = resp -> resp
+        %Response{status: :ok} = resp -> Response.Parser.parse(resp)
       end
-      |> Response.parse_fetch_headers()
 
     Rules.Arg.new(msgid, headers)
   end

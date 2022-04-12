@@ -70,8 +70,11 @@ defmodule ImapFilter.Stages.NewMessagesProducer do
   defp enqueue_new_messages(session_name, mailbox, queue_name) do
     %Response{status: :ok} = resp = Session.search(session_name, mailbox, [:all])
 
-    found_messages = Response.parse_search_results(resp, mailbox, "uid_validity")
-    found_messages |> MessageQueue.enqueue_list(queue_name)
+    Response.Parser.parse(resp)
+    |> Enum.map(fn uid ->
+      {"uid_validity", mailbox, uid}
+    end)
+    |> MessageQueue.enqueue_list(queue_name)
   end
 
   defp get_demanded_messages(0, messages, _queue), do: messages

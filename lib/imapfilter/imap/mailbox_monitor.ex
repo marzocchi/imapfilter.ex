@@ -118,7 +118,7 @@ defmodule ImapFilter.Imap.MailboxMonitor do
     {:noreply, state}
   end
 
-  defp idle_supported!(%Response{} = resp), do: true = "IDLE" in Response.parse_capability(resp)
+  defp idle_supported!(%Response{} = resp), do: true = "IDLE" in Response.Parser.parse(resp)
 
   defp process_received_data(data, notify_pid) do
     data

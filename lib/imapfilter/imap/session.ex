@@ -51,6 +51,9 @@ defmodule ImapFilter.Imap.Session do
   def fetch_headers(pid, {_, in_mailbox, uid}),
     do: GenServer.call(pid, {:perform, [Request.select(in_mailbox), Request.fetch_headers(uid)]})
 
+  def fetch_attributes(pid, {_, in_mailbox, uid})  ,
+    do: GenServer.call(pid, {:perform, [Request.select(in_mailbox), Request.fetch_attributes(uid)]})
+
   def fetch(pid, {_, in_mailbox, uid}),
     do: GenServer.call(pid, {:perform, [Request.select(in_mailbox), Request.fetch(uid)]})
 

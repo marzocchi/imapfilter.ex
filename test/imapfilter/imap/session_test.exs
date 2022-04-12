@@ -170,4 +170,13 @@ defmodule ImapFilter.Imap.SessionTest do
     %Response{status: :ok} = Session.create(pid, "#{path}/a/b/c")
     %Response{status: :no} = Session.create(pid, "#{path}/a/b/c")
   end
+
+  test "fetch_attributes", %{params: params} do
+    pid = start_supervised!({Session, params})
+
+    assert %Response{status: :ok, responses: responses} = Session.fetch_attributes(pid, {"", "INBOX", "1"})
+    assert [{:untagged, "* 1 FETCH (UID 1 FLAGS (\\Deleted \\Seen) RFC822.HEADER {498}\r\n)\r\n", {:literal, 498, literal_text}}] = responses
+    size = byte_size(literal_text)
+    assert ^size = 498
+  end
 end
