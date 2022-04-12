@@ -6,6 +6,7 @@ WORKDIR /project
 ENV MIX_ENV=prod
 
 RUN mix local.hex --force
+RUN mix local.rebar --force
 RUN mix deps.get --only $MIX_ENV
 RUN MIX_ENV=prod mix release --path /app
 
