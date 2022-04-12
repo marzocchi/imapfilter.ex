@@ -171,6 +171,7 @@ defmodule ImapFilter.Imap.SessionTest do
     %Response{status: :no} = Session.create(pid, "#{path}/a/b/c")
   end
 
+  @tag :skip
   test "fetch_attributes", %{params: params} do
     pid = start_supervised!({Session, params})
 
