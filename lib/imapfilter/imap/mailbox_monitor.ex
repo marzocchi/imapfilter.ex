@@ -77,7 +77,8 @@ defmodule ImapFilter.Imap.MailboxMonitor do
   @impl true
   def handle_info(
         :idle_start,
-        %{socket: socket, counter: counter, reidle_interval: reidle_interval, notify: notify} = state
+        %{socket: socket, counter: counter, reidle_interval: reidle_interval, notify: notify_pid} =
+          state
       ) do
     :ok =
       Socket.send(
@@ -85,21 +86,21 @@ defmodule ImapFilter.Imap.MailboxMonitor do
         Request.idle() |> Request.tagged(counter = counter + 1) |> Request.raw()
       )
 
-    send(notify, :idle_started)
+    send(resolve_notification_target(notify_pid), :idle_started)
 
     Process.send_after(self(), :idle_stop, reidle_interval)
     {:noreply, %{state | counter: counter}}
   end
 
   @impl true
-  def handle_info(:idle_stop, %{socket: socket, counter: counter, notify: notify} = state) do
+  def handle_info(:idle_stop, %{socket: socket, counter: counter, notify: notify_pid} = state) do
     :ok =
       Socket.send(
         socket,
         Request.done() |> Request.raw()
       )
 
-    send(notify, :idle_stopped)
+    send(resolve_notification_target(notify_pid), :idle_stopped)
     send(self(), :idle_start)
     {:noreply, %{state | counter: counter}}
   end
@@ -129,13 +130,15 @@ defmodule ImapFilter.Imap.MailboxMonitor do
 
   defp send_notification([], _notify_id), do: nil
 
-  defp send_notification(lines, {:via, Registry, {reg, name}}) do
-    [{pid, _}] = Registry.lookup(reg, name)
-    send_notification(lines, pid)
-  end
+  defp send_notification(lines, notify_pid),
+    do: send(resolve_notification_target(notify_pid), {:mailbox_activity, lines})
 
-  defp send_notification(lines, notify_pid) when is_pid(notify_pid),
-    do: send(notify_pid, {:mailbox_activity, lines})
+  defp resolve_notification_target(pid) when is_pid(pid), do: pid
+
+  defp resolve_notification_target({:via, Registry, {reg, name}}) do
+    [{pid, _}] = Registry.lookup(reg, name)
+    pid
+  end
 
   defp is_interesting_line(line) do
     Regex.match?(~r/^\* \d+ EXISTS/, line) ||

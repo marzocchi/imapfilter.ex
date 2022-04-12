@@ -28,6 +28,9 @@ defmodule ImapFilter.Stages.NewMessagesProducer do
     {:producer, state}
   end
 
+  def handle_info(:idle_started, %{} = state), do: {:noreply, [], state}
+  def handle_info(:idle_stopped, %{} = state), do: {:noreply, [], state}
+
   def handle_info(
         {:mailbox_activity, activity},
         %{
