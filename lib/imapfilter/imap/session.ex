@@ -11,7 +11,7 @@ defmodule ImapFilter.Imap.Session do
     name: nil,
     socket: nil,
     conn: %{},
-    name_for_logger: nil
+    logger_metadata: nil
   }
 
   def start_link(%{name: name} = init_arg) do
@@ -22,8 +22,8 @@ defmodule ImapFilter.Imap.Session do
     )
   end
 
-  def init(%{name_for_logger: name} = state) do
-    Logger.metadata(name_for_logger: name)
+  def init(%{logger_metadata: md} = state) when md != nil do
+    Logger.metadata(md)
     {:ok, state}
   end
 
@@ -132,7 +132,8 @@ defmodule ImapFilter.Imap.Session do
     counter = counter + 1
 
     case Client.get_response(socket, req |> Request.tagged(counter)) do
-      {:error, err} when err in [:closed, :enotconn] ->
+      {:error, err} ->
+        Logger.error("Reconnecting and retrying #{req.command} after error #{err}")
         {socket, counter} = connect_if_needed(nil, counter, conn)
         get_response(socket, req, counter, attempts - 1, conn)
 

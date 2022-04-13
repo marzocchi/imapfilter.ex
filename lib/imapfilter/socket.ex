@@ -56,7 +56,7 @@ defmodule ImapFilter.Socket do
 
   defp accumulate_lines(socket, acc, timeout) do
     case recv(socket) do
-      {:error, :closed} = ret ->
+      {:error, _} = ret ->
         ret
 
       {:ok, chunk} ->
