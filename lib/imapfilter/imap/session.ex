@@ -68,7 +68,7 @@ defmodule ImapFilter.Imap.Session do
     do:
       GenServer.call(pid, {:perform, [Request.select(in_mailbox), Request.copy(uid, to_mailbox)]})
 
-  def create(pid, path), do: GenServer.call(pid, {:perform, [Request.create(path)]})
+  def create(pid, path), do: GenServer.call(pid, {:perform, Request.create(path)})
 
   def move(pid, {_, from_mailbox, uid}, to_mailbox),
     do:
@@ -88,57 +88,31 @@ defmodule ImapFilter.Imap.Session do
 
   def close(pid), do: GenServer.call(pid, :close)
 
-  def handle_call({:perform, ops}, _from, %{socket: socket, counter: counter, conn: conn} = state) do
-    ops =
-      case ops do
-        %Request{} = ops -> [ops]
-        ops when is_list(ops) -> ops
-      end
-
-    {socket, counter} = connect_if_needed(socket, counter, conn)
-
-    {[resp | _], counter} = perform(socket, ops, [], counter, conn)
-
-    {:reply, resp, %{state | socket: socket, conn: conn, counter: counter}}
-  end
-
   def handle_call(:close, _from, %{socket: socket} = state) do
     Client.close(socket)
     {:reply, :ok, %{state | socket: nil}}
   end
 
-  defp perform(_socket, [], responses, counter, _conn), do: {responses, counter}
+  def handle_call({:perform, %Request{} = req}, from, %{} = state),
+    do: handle_call({:perform, [req]}, from, state)
 
-  defp perform(socket, [%Request{} = head | tail], responses, counter, conn) do
-    resp = get_response(socket, head, counter, 1, conn)
-
-    case resp do
-      {%Response{status: :ok} = resp, counter} ->
-        log_response(resp)
-        perform(socket, tail, [resp | responses], counter, conn)
-
-      {%Response{status: status} = resp, counter} when status != :ok ->
-        log_response(resp)
-        {[resp | responses], counter}
-    end
+  def handle_call({:perform, ops}, _from, %{socket: socket, counter: counter, conn: conn} = state) do
+    {socket, counter} = connect_if_needed(socket, counter, conn)
+    perform(ops, [], %{state | socket: socket, counter: counter})
   end
 
-  defp get_response(socket, req, counter, 0 = _attempts, _conn) do
-    resp = Client.get_response(socket, req |> Request.tagged(counter = counter + 1))
-    {resp, counter}
-  end
+  defp perform([], [resp | _], %{} = state), do: {:reply, resp, state}
 
-  defp get_response(socket, req, counter, attempts, conn) do
-    counter = counter + 1
+  defp perform([%Request{} = head | tail], responses, %{socket: socket, counter: counter} = state) do
+    case Client.get_response(socket, head |> Request.tagged(counter = counter + 1)) do
+      {:error, _} = err ->
+        {:reply, err, %{state | counter: counter}}
 
-    case Client.get_response(socket, req |> Request.tagged(counter)) do
-      {:error, err} ->
-        Logger.error("Reconnecting and retrying #{req.command} after error #{err}")
-        {socket, counter} = connect_if_needed(nil, counter, conn)
-        get_response(socket, req, counter, attempts - 1, conn)
+      %Response{status: status} = resp when status != :ok ->
+        {:reply, resp, %{state | counter: counter}}
 
-      %Response{} = resp ->
-        {resp, counter}
+      %Response{status: :ok} = resp ->
+        perform(tail, [resp | responses], %{state | counter: counter})
     end
   end
 
@@ -156,19 +130,4 @@ defmodule ImapFilter.Imap.Session do
     {:ok, counter} = start(socket, user, pass, counter)
     {socket, counter}
   end
-
-  defp log_response(%Response{
-         status: :ok = status,
-         status_line: status_line,
-         req: %Request{tag: tag, command: command}
-       }),
-       do: Logger.info("Request #{tag} #{command} succeeded: #{status} #{status_line}")
-
-  defp log_response(%Response{
-         status: status,
-         status_line: status_line,
-         req: %Request{tag: tag, command: command}
-       })
-       when status != :ok,
-       do: Logger.error("Request #{tag} #{command} failed: #{status} #{status_line}")
 end

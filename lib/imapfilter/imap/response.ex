@@ -127,20 +127,4 @@ defmodule ImapFilter.Imap.Response do
       list
     end
   end
-
-  defp first_untagged_response_text(%Response{responses: responses}) do
-    responses
-    |> Enum.filter(fn x ->
-      case x do
-        {:untagged, _} -> true
-        {:untagged, _, {:literal, _size, _v}} -> true
-        _ -> false
-      end
-    end)
-    |> Enum.at(0)
-    |> case do
-      {:untagged, v} -> v
-      {:untagged, _, {:literal, _size, v}} -> v
-    end
-  end
 end

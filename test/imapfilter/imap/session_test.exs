@@ -39,12 +39,12 @@ defmodule ImapFilter.Imap.SessionTest do
     assert %Response{status: :ok} = Session.select(pid, "INBOX")
   end
 
-  test "logout with implied disconnect and autoreconnect", %{params: params} do
+  test "requests with disconnect", %{params: params} do
     pid = start_supervised!({Session, params})
 
     assert %Response{status: :ok} = Session.select(pid, "INBOX")
     assert %Response{status: :ok} = Session.logout(pid)
-    assert %Response{status: :ok} = Session.select(pid, "INBOX")
+    assert {:error, :closed} = Session.select(pid, "INBOX")
   end
 
   test "login", %{params: params} do

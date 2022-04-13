@@ -2,6 +2,8 @@ defmodule ImapFilter.Imap.Client do
   # works around 'imported Kernel.send/2 conflicts with local function' which happens when aliasing
   import Kernel, except: [send: 2]
 
+  require Logger
+
   alias ImapFilter.Imap.Request
   alias ImapFilter.Imap.Response
   alias ImapFilter.Socket
@@ -30,16 +32,44 @@ defmodule ImapFilter.Imap.Client do
 
   def close(socket), do: Socket.close(socket)
 
-  def send(socket, %Request{literal: nil} = req), do: Socket.send(socket, Request.raw(req))
+  def send(socket, %Request{literal: nil, command: command} = req) do
+    case Socket.send(socket, Request.raw(req)) do
+      {:error, msg} = err ->
+        Logger.error("Send of #{command} on socket failed: #{msg}")
+        err
+
+      :ok ->
+        :ok
+    end
+  end
 
   def send(socket, %Request{literal: literal} = req) when literal != nil do
     {command, literal} = Request.raw(req)
 
     literal_size = byte_size(literal)
-    Socket.send(socket, "#{command} {#{literal_size}}\r\n")
 
-    true = ok_to_continue(socket)
-    Socket.send(socket, literal <> "\r\n")
+    case Socket.send(socket, "#{command} {#{literal_size}}\r\n") do
+      {:error, msg} = err ->
+        Logger.error("Send of #{command} with literal failed: #{msg}")
+        err
+
+      :ok ->
+        case ok_to_continue(socket) do
+          {:error, msg} = err ->
+            Logger.error("Recv of server's continuation failed: #{msg}")
+            err
+
+          true ->
+            case Socket.send(socket, literal <> "\r\n") do
+              {:error, msg} = err ->
+                Logger.error("Send of literal text failed: #{msg}")
+                err
+
+              :ok ->
+                :ok
+            end
+        end
+    end
   end
 
   def get_response(socket, %Request{tag: tag} = req) when tag != nil do
@@ -53,6 +83,7 @@ defmodule ImapFilter.Imap.Client do
             err
 
           %Response{status: status} = resp when status != nil ->
+            log_response(resp)
             resp
         end
     end
@@ -177,7 +208,27 @@ defmodule ImapFilter.Imap.Client do
   end
 
   defp ok_to_continue(socket) do
-    line = Socket.recv_lines(socket)
-    String.starts_with?(line, "+ OK")
+    case Socket.recv_lines(socket) do
+      {:error, _} = err ->
+        err
+
+      line ->
+        String.starts_with?(line, "+ OK")
+    end
   end
+
+  defp log_response(%Response{
+         status: :ok = status,
+         status_line: status_line,
+         req: %Request{tag: tag, command: command}
+       }),
+       do: Logger.info("Request #{tag} #{command} succeeded: #{status} #{status_line}")
+
+  defp log_response(%Response{
+         status: status,
+         status_line: status_line,
+         req: %Request{tag: tag, command: command}
+       })
+       when status != :ok,
+       do: Logger.error("Request #{tag} #{command} failed: #{status} #{status_line}")
 end
