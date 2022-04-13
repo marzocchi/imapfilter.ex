@@ -1,6 +1,6 @@
 defmodule ImapFilter.Imap.Session do
   use GenServer
-  import Logger
+  require Logger
 
   alias ImapFilter.Imap.Request
   alias ImapFilter.Imap.Response
@@ -11,7 +11,7 @@ defmodule ImapFilter.Imap.Session do
     name: nil,
     socket: nil,
     conn: %{},
-    started: false
+    name_for_logger: nil
   }
 
   def start_link(%{name: name} = init_arg) do
@@ -22,9 +22,12 @@ defmodule ImapFilter.Imap.Session do
     )
   end
 
-  def init(state) do
+  def init(%{name_for_logger: name} = state) do
+    Logger.metadata(name_for_logger: name)
     {:ok, state}
   end
+
+  def init(state), do: {:ok, state}
 
   def start(socket, user, pass, counter) do
     %Response{status: :ok} =
@@ -51,8 +54,9 @@ defmodule ImapFilter.Imap.Session do
   def fetch_headers(pid, {_, in_mailbox, uid}),
     do: GenServer.call(pid, {:perform, [Request.select(in_mailbox), Request.fetch_headers(uid)]})
 
-  def fetch_attributes(pid, {_, in_mailbox, uid})  ,
-    do: GenServer.call(pid, {:perform, [Request.select(in_mailbox), Request.fetch_attributes(uid)]})
+  def fetch_attributes(pid, {_, in_mailbox, uid}),
+    do:
+      GenServer.call(pid, {:perform, [Request.select(in_mailbox), Request.fetch_attributes(uid)]})
 
   def fetch(pid, {_, in_mailbox, uid}),
     do: GenServer.call(pid, {:perform, [Request.select(in_mailbox), Request.fetch(uid)]})
@@ -110,19 +114,11 @@ defmodule ImapFilter.Imap.Session do
 
     case resp do
       {%Response{status: :ok} = resp, counter} ->
-        info(
-          "Request #{resp.req.tag} #{resp.req.command} succeeded: #{resp.status} #{resp.status_line}"
-        )
-
+        log_response(resp)
         perform(socket, tail, [resp | responses], counter, conn)
 
-      {%Response{
-         req: %Request{tag: tag, command: command},
-         status: status,
-         status_line: status_line
-       } = resp, counter} ->
-        error("Request #{tag} #{command} failed: #{status} #{status_line}")
-
+      {%Response{status: status} = resp, counter} when status != :ok ->
+        log_response(resp)
         {[resp | responses], counter}
     end
   end
@@ -159,4 +155,19 @@ defmodule ImapFilter.Imap.Session do
     {:ok, counter} = start(socket, user, pass, counter)
     {socket, counter}
   end
+
+  defp log_response(%Response{
+         status: :ok = status,
+         status_line: status_line,
+         req: %Request{tag: tag, command: command}
+       }),
+       do: Logger.info("Request #{tag} #{command} succeeded: #{status} #{status_line}")
+
+  defp log_response(%Response{
+         status: status,
+         status_line: status_line,
+         req: %Request{tag: tag, command: command}
+       })
+       when status != :ok,
+       do: Logger.error("Request #{tag} #{command} failed: #{status} #{status_line}")
 end

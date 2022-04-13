@@ -41,7 +41,7 @@ defmodule ImapFilter.Imap.ClientTest do
       end)
       |> Enum.at(0)
 
-    assert {:untagged, line, {:literal, 506, literal}} = fetch_resp
+    assert {:untagged, line, {:literal, {506, 506}, literal}} = fetch_resp
     assert String.starts_with?(line, "* 1 FETCH (UID 1 ")
     assert 506 = byte_size(literal)
   end

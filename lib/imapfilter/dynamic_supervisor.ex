@@ -63,10 +63,16 @@ defmodule ImapFilter.DynamicSupervisor do
            [%{name: unique_name(registry_name, :producer_queue)}]}
       },
       %{
-        :id => :producer_client,
+        :id => :producer_session,
         :start =>
           {ImapFilter.Imap.Session, :start_link,
-           [%{name: unique_name(registry_name, :producer_session), conn: conn_params}]}
+           [
+             %{
+               name: unique_name(registry_name, :producer_session),
+               conn: conn_params,
+               name_for_logger: "producer_session"
+             }
+           ]}
       },
       %{
         :id => :producer,
@@ -92,7 +98,7 @@ defmodule ImapFilter.DynamicSupervisor do
         :start => {
           ImapFilter.Imap.Session,
           :start_link,
-          [%{name: unique_name(registry_name, :consumer_session), conn: conn_params}]
+          [%{name: unique_name(registry_name, :consumer_session), conn: conn_params, name_for_logger: "consumer_session"}]
         }
       },
       %{

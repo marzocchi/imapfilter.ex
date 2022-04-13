@@ -71,12 +71,12 @@ defmodule ImapFilter.Imap.Client do
   defp process_lines(
          socket,
          lines,
-         {:untagged, line, {:literal, size, v} = lit},
+         {:untagged, line, {:literal, {collected, size}, _v} = lit},
          %Response{} = resp
        )
-       when byte_size(v) < size do
-
+       when collected < size do
     {lit, rest} = collect_literal(socket, lines, lit)
+
     process_lines(socket, rest, {:untagged, line, lit}, resp)
   end
 
@@ -93,7 +93,9 @@ defmodule ImapFilter.Imap.Client do
       size = is_untagged_response_with_literal(line) ->
         resp = append_response(resp, cur)
 
-        cur = {:untagged, line <> "\r\n", {:literal, size, ""}}
+        msg = line <> "\r\n"
+
+        cur = {:untagged, msg, {:literal, {0, size}, ""}}
         process_lines(socket, tail, cur, resp)
 
       # untagged resp
@@ -127,11 +129,12 @@ defmodule ImapFilter.Imap.Client do
     end
   end
 
-  defp collect_literal(_socket, lines, {:literal, size, v} = lit)
-       when byte_size(v) == size,
-       do: {lit, lines}
+  defp collect_literal(_socket, lines, {:literal, {collected, size}, v})
+       when collected == size,
+       do: {{:literal, {collected, size}, v}, lines}
 
-  defp collect_literal(socket, [], {:literal, size, v} = lit) when byte_size(v) < size do
+  defp collect_literal(socket, [], {:literal, {collected, size}, _v} = lit)
+       when collected < size do
     case Socket.recv_lines(socket) do
       {:error, _} = err ->
         err
@@ -141,10 +144,11 @@ defmodule ImapFilter.Imap.Client do
     end
   end
 
-  defp collect_literal(socket, [line | tail], {:literal, size, v}) when byte_size(v) < size do
+  defp collect_literal(socket, [line | tail], {:literal, {collected, size}, v})
+       when collected < size do
     # FIXME appending line terminator should be done either here or above
     v = v <> line <> "\r\n"
-    collect_literal(socket, tail, {:literal, size, v})
+    collect_literal(socket, tail, {:literal, {byte_size(v), size}, v})
   end
 
   defp append_response(%Response{} = resp, _cur = nil), do: resp

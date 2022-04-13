@@ -94,7 +94,7 @@ defmodule ImapFilter.Imap.SessionTest do
     assert %Response{status: :ok, responses: responses} =
              Session.fetch_headers(pid, {"", "INBOX", "1"})
 
-    assert [{:untagged, ^expected_cmd, {:literal, 498, ^expected_body}}] = responses
+    assert [{:untagged, ^expected_cmd, {:literal, {498, 498}, ^expected_body}}] = responses
   end
 
   test "fetch_subject", %{params: params} do
@@ -103,7 +103,7 @@ defmodule ImapFilter.Imap.SessionTest do
     assert %Response{status: :ok, responses: responses} =
              Session.fetch_subject(pid, {"", "INBOX", "1"})
 
-    assert [{:untagged, _, {:literal, 35, "Subject: Very important message\r\n\r\n"}}] = responses
+    assert [{:untagged, _, {:literal, {35, 35}, "Subject: Very important message\r\n\r\n"}}] = responses
   end
 
   test "fetch", %{params: params} do
@@ -131,7 +131,7 @@ defmodule ImapFilter.Imap.SessionTest do
       |> Enum.join("\r\n")
 
     assert %Response{status: :ok, responses: responses} = Session.fetch(pid, {"", "INBOX", "1"})
-    assert [{:untagged, _command, {:literal, 506, ^expected_body}}] = responses
+    assert [{:untagged, _command, {:literal, {506, 506}, ^expected_body}}] = responses
   end
 
   test "copy", %{params: params} do
