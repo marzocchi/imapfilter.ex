@@ -1,6 +1,8 @@
 defmodule ImapFilter.Socket do
   import Logger
 
+  @default_timeout 1_000
+
   def connect(:tcp, host, port) do
     {:ok, port} = :gen_tcp.connect(to_charlist(host), port, [:binary, active: false])
     {:ok, {:gen_tcp, port}}
@@ -42,15 +44,18 @@ defmodule ImapFilter.Socket do
   def send({:sslsocket, _, _} = socket, msg), do: :ssl.send(socket, log_outgoing(msg))
   def send({:gen_tcp, port}, msg), do: :gen_tcp.send(port, log_outgoing(msg))
 
-  def recv(socket), do: recv(socket, 0)
+  def recv(socket, timeout \\ @default_timeout)
 
-  def recv({:gen_tcp, port}, length), do: :gen_tcp.recv(port, length) |> log_incoming
-  def recv({:sslsocket, _, _} = socket, length), do: :ssl.recv(socket, length) |> log_incoming
+  def recv({:gen_tcp, port}, timeout),
+    do: :gen_tcp.recv(port, 0, timeout) |> log_incoming
 
-  def recv_lines(socket), do: recv_lines(socket, "")
+  def recv({:sslsocket, _, _} = socket, timeout),
+    do: :ssl.recv(socket, 0, timeout) |> log_incoming
 
-  def recv_lines(socket, acc) do
-    case recv(socket, 0) do
+  def recv_lines(socket, timeout \\ @default_timeout), do: accumulate_lines(socket, "", timeout)
+
+  defp accumulate_lines(socket, acc, timeout) do
+    case recv(socket) do
       {:error, :closed} = ret ->
         ret
 
@@ -60,7 +65,7 @@ defmodule ImapFilter.Socket do
         if String.ends_with?(chunk, "\r\n") do
           acc
         else
-          recv_lines(socket, acc)
+          accumulate_lines(socket, acc, timeout)
         end
     end
   end
