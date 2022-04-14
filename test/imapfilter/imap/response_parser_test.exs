@@ -9,11 +9,11 @@ defmodule ImapFilter.Imap.Response.ParserTest do
     resp = %Response{
       status: :ok,
       status_line:
-        "T2 OK [APPENDUID 1648852787 219] Append completed (0.181 + 0.003 + 0.178 secs)",
+        "[APPENDUID 1649942063 5] Append completed (0.181 + 0.003 + 0.178 secs)",
       req: %Request{tag: "T2", command: :append}
     }
 
-    assert "219" == Response.Parser.parse(resp)
+    assert "5" == Response.Parser.parse(resp)
   end
 
   test "parse SEARCH response" do

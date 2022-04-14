@@ -4,6 +4,8 @@ defmodule ImapFilter.Imap.Response do
 
   defstruct status_line: "", status: nil, responses: [], req: nil
 
+  def empty?(%Response{responses: list}), do: Enum.count(list) == 0
+
   defmodule Parser do
     def parse(
           %Response{
@@ -63,9 +65,9 @@ defmodule ImapFilter.Imap.Response do
     def parse(%Response{
           status: :ok,
           status_line: status_line,
-          req: %Request{tag: tag, command: :append}
+          req: %Request{command: :append}
         }) do
-      pattern = Regex.compile!("^#{tag} OK.*APPENDUID \\d+ (\\d+)")
+      pattern = Regex.compile!("APPENDUID \\d+ (\\d+)")
 
       case Regex.run(pattern, status_line, capture: :all_but_first) do
         match when is_list(match) -> Enum.at(match, 0)
@@ -106,11 +108,13 @@ defmodule ImapFilter.Imap.Response do
       end)
     end
 
-    defp parse_as_headers_list(msg) do
+    defp parse_as_headers_list(msg) when is_binary(msg) do
       with {list, _} <- :mimemail.parse_headers(msg) do
         list
       end
     end
+
+    defp parse_as_headers_list(_msg), do: []
   end
 
   # TODO naming

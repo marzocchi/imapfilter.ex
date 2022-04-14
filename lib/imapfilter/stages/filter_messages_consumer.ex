@@ -15,6 +15,11 @@ defmodule ImapFilter.Stages.FilterMessagesConsumer do
   def init(%{producers: producers} = init_arg), do: {:consumer, init_arg, subscribe_to: producers}
 
   def handle_events(messages, _from, %{rules: rules, session: session} = state) do
+    apply_rules(session, rules, messages)
+    {:noreply, [], state}
+  end
+
+  def apply_rules(session, rules, messages) do
     {successful, failures} =
       messages
       |> Enum.map(fn msgid -> assemble_arg(session, msgid) end)
@@ -28,23 +33,42 @@ defmodule ImapFilter.Stages.FilterMessagesConsumer do
         end
       end)
 
-    successful
-    |> Enum.map(fn arg ->
-      case find_matching_rule(arg, rules) do
-        %{actions: _actions} = rule ->
-          {arg, rule}
+    failures
+    |> Enum.each(fn {:error, msgid, msg} ->
+      {_, mailbox, uid} = msgid
 
-        nil ->
-          {arg, nil}
-      end
+      msg =
+        case msg do
+          {:error, err} ->
+            err
+
+          text ->
+            text
+        end
+
+      Logger.error("can't process #{uid} in #{mailbox}, got #{msg} while retrieving attributes")
     end)
-    |> Enum.filter(fn {_arg, rule} -> rule != nil end)
-    |> Enum.map(fn {arg, %{actions: actions, label: label}} ->
-      Enum.map(actions, fn %{impl: impl, args: args} ->
-        result = apply(__MODULE__, String.to_existing_atom(impl), [session, arg] ++ args)
-        {label, impl, result}
+
+    rules_outcomes =
+      successful
+      |> Enum.map(fn arg ->
+        case find_matching_rule(arg, rules) do
+          %{actions: _actions} = rule ->
+            {arg, rule}
+
+          nil ->
+            {arg, nil}
+        end
       end)
-    end)
+      |> Enum.filter(fn {_arg, rule} -> rule != nil end)
+      |> Enum.flat_map(fn {arg, %{actions: actions, label: label}} ->
+        Enum.map(actions, fn %{impl: impl, args: args} ->
+          result = apply(__MODULE__, String.to_existing_atom(impl), [session, arg] ++ args)
+          {label, impl, result}
+        end)
+      end)
+
+    rules_outcomes
     |> Enum.each(fn {label, impl, result} ->
       case result do
         :ok ->
@@ -55,12 +79,7 @@ defmodule ImapFilter.Stages.FilterMessagesConsumer do
       end
     end)
 
-    failures
-    |> Enum.each(fn {msgid, {:error, err}} ->
-      Logger.error("can't process #{msgid}, got #{err} while retrieving attributes")
-    end)
-
-    {:noreply, [], state}
+    rules_outcomes
   end
 
   def move_to_folder(session, %Rules.Arg{msgid: msgid}, to_folder) do
@@ -80,10 +99,12 @@ defmodule ImapFilter.Stages.FilterMessagesConsumer do
     Session.fetch_headers(session, msgid)
     |> case do
       {:error, _} = err ->
-        {msgid, err}
+        {:error, msgid, err}
 
       %Response{status: :ok} = resp ->
-        Rules.Arg.new(msgid, Response.Parser.parse(resp))
+        if Response.empty?(resp),
+          do: {:error, msgid, "message not found"},
+          else: Rules.Arg.new(msgid, Response.Parser.parse(resp))
     end
   end
 

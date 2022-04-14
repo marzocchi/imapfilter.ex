@@ -33,6 +33,7 @@ defmodule ImapFilter.EndToEndTest do
     }
   end
 
+  @tag :e2e
   test "e2e" do
     System.put_env("IMAPFILTER_CONFIG_FILE", "./test/config.test.yaml")
 
