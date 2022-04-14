@@ -29,16 +29,6 @@ defmodule ImapFilter.Imap.Session do
 
   def init(state), do: {:ok, state}
 
-  def start(socket, user, pass, counter) do
-    %Response{status: :ok} =
-      Client.get_response(
-        socket,
-        Request.login(user, pass) |> Request.tagged(counter = counter + 1)
-      )
-
-    {:ok, counter}
-  end
-
   def append(pid, msg, to_mailbox),
     do: GenServer.call(pid, {:perform, Request.append(msg, to_mailbox)})
 
@@ -106,7 +96,7 @@ defmodule ImapFilter.Imap.Session do
   defp perform([%Request{} = head | tail], responses, %{socket: socket, counter: counter} = state) do
     case Client.get_response(socket, head |> Request.tagged(counter = counter + 1)) do
       {:error, _} = err ->
-        {:reply, err, %{state | counter: counter}}
+        {:reply, err, %{state | counter: counter, socket: nil}}
 
       %Response{status: status} = resp when status != :ok ->
         {:reply, resp, %{state | counter: counter}}
@@ -129,5 +119,15 @@ defmodule ImapFilter.Imap.Session do
     {:ok, socket} = Client.connect(type, host, port, verify)
     {:ok, counter} = start(socket, user, pass, counter)
     {socket, counter}
+  end
+
+  defp start(socket, user, pass, counter) do
+    %Response{status: :ok} =
+      Client.get_response(
+        socket,
+        Request.login(user, pass) |> Request.tagged(counter = counter + 1)
+      )
+
+    {:ok, counter}
   end
 end
