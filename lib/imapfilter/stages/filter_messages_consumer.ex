@@ -1,7 +1,7 @@
 defmodule ImapFilter.Stages.FilterMessagesConsumer do
   use GenStage
 
-  import Logger
+  require Logger
 
   alias ImapFilter.Imap.Response
   alias ImapFilter.Imap.Session
@@ -15,56 +15,76 @@ defmodule ImapFilter.Stages.FilterMessagesConsumer do
   def init(%{producers: producers} = init_arg), do: {:consumer, init_arg, subscribe_to: producers}
 
   def handle_events(messages, _from, %{rules: rules, session: session} = state) do
-    messages
-    |> Enum.each(fn msgid ->
-      rule_arg = assemble_arg(session, msgid)
+    {successful, failures} =
+      messages
+      |> Enum.map(fn msgid -> assemble_arg(session, msgid) end)
+      |> Enum.split_with(fn a ->
+        case a do
+          %Rules.Arg{} ->
+            true
 
-      case find_matching_rule(rule_arg, rules) do
-        %{actions: _actions, label: label} = rule ->
-          info("rule matched: #{label}")
-          apply_actions(session, rule_arg, rule)
+          _ ->
+            false
+        end
+      end)
 
-        _ ->
-          info("no rule matched")
+    successful
+    |> Enum.map(fn arg ->
+      case find_matching_rule(arg, rules) do
+        %{actions: _actions} = rule ->
+          {arg, rule}
+
+        nil ->
+          {arg, nil}
       end
+    end)
+    |> Enum.filter(fn {_arg, rule} -> rule != nil end)
+    |> Enum.map(fn {arg, %{actions: actions, label: label}} ->
+      Enum.map(actions, fn %{impl: impl, args: args} ->
+        result = apply(__MODULE__, String.to_existing_atom(impl), [session, arg] ++ args)
+        {label, impl, result}
+      end)
+    end)
+    |> Enum.each(fn {label, impl, result} ->
+      case result do
+        :ok ->
+          Logger.info("#{label} #{impl} -> :ok")
+
+        {:error, msg} ->
+          Logger.error("#{label} #{impl} -> error: #{msg}")
+      end
+    end)
+
+    failures
+    |> Enum.each(fn {msgid, {:error, err}} ->
+      Logger.error("can't process #{msgid}, got #{err} while retrieving attributes")
     end)
 
     {:noreply, [], state}
   end
 
-  def apply_actions(session, %Rules.Arg{msgid: {_, _, uid} = msgid}, %{
-        label: label,
-        actions: actions
-      }) do
-    actions
-    |> Enum.each(fn action ->
-      case action do
-        %{impl: "move_to_folder" = impl, args: [to_folder]} ->
-          info("applying rule #{label}'s action '#{impl}' to message #{uid}")
+  def move_to_folder(session, %Rules.Arg{msgid: msgid}, to_folder) do
+    case Session.move(session, msgid, to_folder) do
+      {:error, msg} ->
+        {:error, "socket error: #{msg}"}
 
-          Session.move(session, msgid, to_folder)
-          |> case do
-            %Response{status: :bad, status_line: status_line} ->
-              error("action failed: BAD #{status_line}")
+      %Response{status: status, status_line: status_line} when status in [:bad, :no] ->
+        {:error, status_line}
 
-            %Response{status: :no, status_line: status_line} ->
-              error("action failed: NO #{status_line}")
-
-            %Response{status: :ok, status_line: status_line} ->
-              info("action succeeded: OK #{status_line}")
-          end
-      end
-    end)
+      %Response{status: :ok} ->
+        :ok
+    end
   end
 
   defp assemble_arg(session, msgid) do
-    headers =
-      Session.fetch_headers(session, msgid)
-      |> case do
-        %Response{status: :ok} = resp -> Response.Parser.parse(resp)
-      end
+    Session.fetch_headers(session, msgid)
+    |> case do
+      {:error, _} = err ->
+        {msgid, err}
 
-    Rules.Arg.new(msgid, headers)
+      %Response{status: :ok} = resp ->
+        Rules.Arg.new(msgid, Response.Parser.parse(resp))
+    end
   end
 
   defp find_matching_rule(%Rules.Arg{}, []), do: nil
