@@ -1,3 +1,6 @@
 import Config
 
-config :logger, :console, format: "$time $metadata[$level] $levelpad$message\n" , level: :info, metadata: [:name]
+config :logger, :console,
+  format: "$time $metadata[$level] $levelpad$message\n",
+  metadata: [:name],
+  level: :info

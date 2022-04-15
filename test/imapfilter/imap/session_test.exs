@@ -49,7 +49,7 @@ defmodule ImapFilter.Imap.SessionTest do
 
   test "login", %{params: params} do
     pid = start_supervised!({Session, params})
-    assert %Response{status: :bad} = Session.login(pid, "foo", "bar")
+    assert {:error, %Response{status: :bad}} = Session.login(pid, "foo", "bar")
   end
 
   test "search", %{params: params} do
@@ -63,7 +63,7 @@ defmodule ImapFilter.Imap.SessionTest do
     pid = start_supervised!({Session, params})
 
     assert %Response{status: :ok} = Session.select(pid, "INBOX")
-    assert %Response{status: :no} = Session.select(pid, UUID.uuid4())
+    assert {:error, %Response{status: :no}} = Session.select(pid, UUID.uuid4())
   end
 
   test "fetch_headers", %{params: params} do
@@ -168,7 +168,7 @@ defmodule ImapFilter.Imap.SessionTest do
     path = UUID.uuid4()
 
     %Response{status: :ok} = Session.create(pid, "#{path}/a/b/c")
-    %Response{status: :no} = Session.create(pid, "#{path}/a/b/c")
+    {:error, %Response{status: :no}} = Session.create(pid, "#{path}/a/b/c")
   end
 
   @tag :skip

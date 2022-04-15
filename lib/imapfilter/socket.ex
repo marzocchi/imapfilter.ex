@@ -1,7 +1,7 @@
 defmodule ImapFilter.Socket do
   import Logger
 
-  @default_timeout 1_000
+  @default_timeout 5_000
 
   def connect(:tcp, host, port) do
     {:ok, port} = :gen_tcp.connect(to_charlist(host), port, [:binary, active: false])
@@ -56,8 +56,8 @@ defmodule ImapFilter.Socket do
 
   defp accumulate_lines(socket, acc, timeout) do
     case recv(socket) do
-      {:error, _} = ret ->
-        ret
+      {:error, _} = err ->
+        err
 
       {:ok, chunk} ->
         acc = acc <> chunk

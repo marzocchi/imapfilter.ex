@@ -14,21 +14,6 @@ defmodule ImapFilter.Imap.Session do
     logger_metadata: nil
   }
 
-  def start_link(%{name: name} = init_arg) do
-    GenServer.start_link(
-      __MODULE__,
-      Map.merge(@initial_state, init_arg),
-      name: name
-    )
-  end
-
-  def init(%{logger_metadata: md} = state) when md != nil do
-    Logger.metadata(md)
-    {:ok, state}
-  end
-
-  def init(state), do: {:ok, state}
-
   def append(pid, msg, to_mailbox),
     do: GenServer.call(pid, {:perform, Request.append(msg, to_mailbox)})
 
@@ -78,14 +63,33 @@ defmodule ImapFilter.Imap.Session do
 
   def close(pid), do: GenServer.call(pid, :close)
 
+  def start_link(%{name: name} = init_arg) do
+    GenServer.start_link(
+      __MODULE__,
+      Map.merge(@initial_state, init_arg),
+      name: name
+    )
+  end
+
+  @impl true
+  def init(%{logger_metadata: md} = state) when md != nil do
+    Logger.metadata(md)
+    {:ok, state}
+  end
+
+  def init(state), do: {:ok, state}
+
+  @impl true
   def handle_call(:close, _from, %{socket: socket} = state) do
     Client.close(socket)
     {:reply, :ok, %{state | socket: nil}}
   end
 
+  @impl true
   def handle_call({:perform, %Request{} = req}, from, %{} = state),
     do: handle_call({:perform, [req]}, from, state)
 
+  @impl true
   def handle_call({:perform, ops}, _from, %{socket: socket, counter: counter, conn: conn} = state) do
     {socket, counter} = connect_if_needed(socket, counter, conn)
     perform(ops, [], %{state | socket: socket, counter: counter})
@@ -94,15 +98,17 @@ defmodule ImapFilter.Imap.Session do
   defp perform([], [resp | _], %{} = state), do: {:reply, resp, state}
 
   defp perform([%Request{} = head | tail], responses, %{socket: socket, counter: counter} = state) do
-    case Client.get_response(socket, head |> Request.tagged(counter = counter + 1)) do
+    counter = counter + 1
+
+    with %Response{} = resp <-
+           Client.get_response(socket, head |> Request.tagged(counter)) do
+      perform(tail, [resp | responses], %{state | counter: counter})
+    else
+      {:error, %Response{}} = err ->
+        {:reply, err, %{state | counter: counter}}
+
       {:error, _} = err ->
         {:reply, err, %{state | counter: counter, socket: nil}}
-
-      %Response{status: status} = resp when status != :ok ->
-        {:reply, resp, %{state | counter: counter}}
-
-      %Response{status: :ok} = resp ->
-        perform(tail, [resp | responses], %{state | counter: counter})
     end
   end
 
@@ -116,18 +122,22 @@ defmodule ImapFilter.Imap.Session do
          type: type,
          verify: verify
        }) do
-    {:ok, socket} = Client.connect(type, host, port, verify)
-    {:ok, counter} = start(socket, user, pass, counter)
-    {socket, counter}
+    counter = counter + 1
+
+    with {:ok, socket} <- Client.connect(type, host, port, verify),
+         %Response{} <- login(socket, user, pass, counter) do
+      {socket, counter}
+    else
+      {:error, _} = err ->
+        {err, counter}
+    end
   end
 
-  defp start(socket, user, pass, counter) do
-    %Response{status: :ok} =
-      Client.get_response(
-        socket,
-        Request.login(user, pass) |> Request.tagged(counter = counter + 1)
-      )
-
-    {:ok, counter}
+  defp login(socket, user, pass, counter) do
+    with %Response{} = resp <- Client.get_response(socket, Request.login(user, pass, counter)) do
+      resp
+    else
+      {:error, _} = err -> err
+    end
   end
 end

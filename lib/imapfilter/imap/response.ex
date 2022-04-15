@@ -7,6 +7,10 @@ defmodule ImapFilter.Imap.Response do
   def empty?(%Response{responses: list}), do: Enum.count(list) == 0
 
   defmodule Parser do
+    def parse(%Response{req: %Request{command: command}, status: :ok, responses: []})
+        when command != :append,
+        do: :empty
+
     def parse(
           %Response{
             status: :ok,
@@ -109,8 +113,16 @@ defmodule ImapFilter.Imap.Response do
     end
 
     defp parse_as_headers_list(msg) when is_binary(msg) do
-      with {list, _} <- :mimemail.parse_headers(msg) do
-        list
+      case :mimemail.parse_headers(msg) do
+        {list, ""} ->
+          list
+
+        {list, rest} ->
+          # FIXME parse_headers wrongly detects start of body wrongly,
+          # so as a workaround, since we don't expect a body, we shave
+          # off the first line, and re-parse the rest
+          [_trashy_first_line, rest_as_text] = String.split(rest, "\r\n", parts: 2)
+          list ++ parse_as_headers_list(rest_as_text)
       end
     end
 
@@ -125,10 +137,4 @@ defmodule ImapFilter.Imap.Response do
 
   def with_status(resp, status, status_line),
     do: %Response{resp | status: status, status_line: status_line}
-
-  def parse_as_headers_list(msg) do
-    with {list, _} <- :mimemail.parse_headers(msg) do
-      list
-    end
-  end
 end
