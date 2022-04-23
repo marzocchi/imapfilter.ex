@@ -90,31 +90,54 @@ defmodule ImapFilter.Imap.Session do
     do: handle_call({:perform, [req]}, from, state)
 
   @impl true
-  def handle_call({:perform, ops}, _from, %{socket: socket, counter: counter, conn: conn} = state) do
-    {socket, counter} = connect_if_needed(socket, counter, conn)
-    perform(ops, [], %{state | socket: socket, counter: counter})
-  end
+  def handle_call({:perform, ops}, _from, %{} = state), do: perform(ops, [], state)
 
   defp perform([], [resp | _], %{} = state), do: {:reply, resp, state}
 
-  defp perform([%Request{} = head | tail], responses, %{socket: socket, counter: counter} = state) do
-    counter = counter + 1
-
-    with %Response{} = resp <-
-           Client.get_response(socket, head |> Request.tagged(counter)) do
-      perform(tail, [resp | responses], %{state | counter: counter})
+  defp perform(
+         [%Request{} = head | tail],
+         responses,
+         %{socket: socket, counter: counter, conn: conn} = state
+       ) do
+    with {%Response{} = resp, socket, counter} <- get_response(1, socket, head, counter, conn) do
+      perform(tail, [resp | responses], %{state | socket: socket, counter: counter})
     else
-      {:error, %Response{}} = err ->
-        {:reply, err, %{state | counter: counter}}
+      {{:error, %Response{}} = err, socket, counter} ->
+        {:reply, err, %{state | socket: socket, counter: counter}}
 
-      {:error, _} = err ->
+      {{:error, _} = err, _socket, counter} ->
         {:reply, err, %{state | counter: counter, socket: nil}}
     end
   end
 
-  defp connect_if_needed(socket, counter, _conn) when socket != nil, do: {socket, counter}
+  defp get_response(attempts_left, socket, req, counter, conn)
 
-  defp connect_if_needed(nil, counter, %{
+  defp get_response(attempts_left, nil = _socket, %Request{} = req, counter, conn) do
+    {socket, counter} = connect(counter, conn)
+    get_response(attempts_left, socket, req, counter, conn)
+  end
+
+  defp get_response(attempts_left, socket, %Request{} = req, counter, conn) do
+    counter = counter + 1
+
+    with %Response{} = resp <- Client.get_response(socket, req |> Request.tagged(counter)) do
+      {resp, socket, counter}
+    else
+      # request reached the server which returned NO/BAD, don't retry
+      {:error, %Response{}} = err ->
+        {err, socket, counter}
+
+      # request did not reach the server (eg. socket error) but no more attempts can be done
+      {:error, _} = err when attempts_left == 0 ->
+        {err, socket, counter}
+
+      # request did not reach the server and we can retry
+      {:error, _} ->
+        get_response(attempts_left - 1, socket, req, counter, conn)
+    end
+  end
+
+  defp connect(counter, %{
          host: host,
          port: port,
          user: user,

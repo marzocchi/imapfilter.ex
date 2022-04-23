@@ -98,9 +98,12 @@ defmodule ImapFilter.Worker do
            queue_name: queue_name
          } = state
        ) do
-    with msgids <- get_new_message_ids(session_name, mailbox) do
-      MessageQueue.enqueue_list(msgids, queue_name)
-      Logger.info("there are now #{MessageQueue.size(queue_name)} messages in queue")
+    with msgids when is_list(msgids) <- get_new_message_ids(session_name, mailbox) do
+      new_size = MessageQueue.enqueue_list(msgids, queue_name)
+      Logger.info("there are now #{new_size} messages in queue")
+    else
+      {:error, _} = err ->
+      Logger.error("can't enqueue new messages due to error: #{inspect(err)}")
     end
 
     GenServer.cast(self(), :dequeue)
