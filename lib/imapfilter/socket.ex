@@ -1,38 +1,48 @@
 defmodule ImapFilter.Socket do
   import Logger
 
-  @default_timeout 5_000
+  @default_timeout 3_000
 
-  def connect(:tcp, host, port) do
-    {:ok, port} = :gen_tcp.connect(to_charlist(host), port, [:binary, active: false])
-    {:ok, {:gen_tcp, port}}
+  def connect(type, host, port, verify \\ true)
+
+  def connect(:tcp, host, port, _verify) do
+    case :gen_tcp.connect(to_charlist(host), port, [:binary, active: false]) do
+      {:ok, port} ->
+        socket = {:gen_tcp, port}
+        setopts(socket, send_timeout: @default_timeout)
+        {:ok, socket}
+
+      anything ->
+        anything
+    end
   end
 
-  def connect(:ssl, host, port), do: connect(:ssl, host, port, true)
-
-  def connect(:tcp, host, port, _verify), do: connect(:tcp, host, port)
-
-  def connect(:ssl, host, port, true = _verify) do
-    opts = [
-      :binary,
-      active: false,
-      verify: :verify_peer,
-      cacertfile: CAStore.file_path()
-    ]
-
-    :ssl.start()
-    :ssl.connect(to_charlist(host), port, opts)
-  end
-
-  def connect(:ssl, host, port, false = _verify) do
+  def connect(:ssl, host, port, verify) do
     opts = [
       :binary,
       active: false,
       verify: :verify_none
     ]
 
+    opts =
+      if verify,
+        do:
+          opts
+          |> Keyword.put(:verify, :verify_peer)
+          |> Keyword.put(:cacertfile, CAStore.file_path()),
+        else: opts
+
     :ssl.start()
     :ssl.connect(to_charlist(host), port, opts)
+
+    case :ssl.connect(to_charlist(host), port, opts) do
+      {:ok, socket} = result ->
+        setopts(socket, send_timeout: @default_timeout)
+        result
+
+      anything ->
+        anything
+    end
   end
 
   def setopts({:sslsocket, _, _} = socket, opts), do: :ssl.setopts(socket, opts)
