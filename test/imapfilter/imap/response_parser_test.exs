@@ -8,8 +8,7 @@ defmodule ImapFilter.Imap.Response.ParserTest do
   test "parse APPEND response" do
     resp = %Response{
       status: :ok,
-      status_line:
-        "[APPENDUID 1649942063 5] Append completed (0.181 + 0.003 + 0.178 secs)",
+      status_line: "[APPENDUID 1649942063 5] Append completed (0.181 + 0.003 + 0.178 secs)",
       req: %Request{tag: "T2", command: :append}
     }
 

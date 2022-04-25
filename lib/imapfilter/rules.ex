@@ -8,10 +8,24 @@ defmodule ImapFilter do
       end
     end
 
+    require Logger
+    alias ImapFilter.Config
+
+    def find_actions([] = _rules, %Rules.Arg{}), do: []
+
+    def find_actions(
+          [%Config.Rule{impl: impl, args: args, actions: actions} | tail],
+          %Rules.Arg{} = arg
+        ) do
+      case Rules.match!(impl, [arg] ++ args) do
+        true -> actions
+        false -> find_actions(tail, arg)
+      end
+    end
+
     def match!(rule_name, args) do
       case apply(Rules, String.to_existing_atom(rule_name), args) do
-        true = b -> b
-        false = b -> b
+        b when is_boolean(b) -> b
         _ -> raise "#{rule_name} did not return a bool"
       end
     end

@@ -25,7 +25,6 @@ defmodule ImapFilter.RulesTest do
     assert matches == false
   end
 
-
   test "header_regex returns false if header not found by name" do
     headers_list = [
       {"Subject", "test"},
